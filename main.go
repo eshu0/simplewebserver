@@ -7,10 +7,21 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
+)
+
+const (
+	master = `Names:{{block "list" .}}{{"\n"}}{{range .}}{{println "-" .}}{{end}}{{end}}`
+)
+
+var (
+	funcs     = template.FuncMap{"join": strings.Join}
+	guardians = []string{"Gamora", "Groot", "Nebula", "Rocket", "Star-Lord"}
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -28,16 +39,24 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
+	masterTmpl, err := template.New("master").Funcs(funcs).Parse(master)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := masterTmpl.Execute(w, guardians); err != nil {
+		log.Fatal(err)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func main() {
+
 	// Create Server and Route Handlers
 	r := mux.NewRouter()
 
 	r.HandleFunc("/", handler)
 	r.HandleFunc("/health", healthHandler)
-	r.HandleFunc("/readiness", readinessHandler)
+	r.HandleFunc("/ui", readinessHandler)
 
 	srv := &http.Server{
 		Handler:      r,
